@@ -1,28 +1,18 @@
 import React, { useCallback, useEffect, useState } from "react";
-import { useChat } from "../../lib/contexts/chat.context";
+import { Message, useChat } from "../../lib/contexts/chat.context";
 
 interface Props {}
 
-type Message = {
-  id: string;
-  content: string;
-};
-
-const generateRandomMessage = (): Message => {
-  const randomString = Math.random().toString(36).substring(7);
-  return {
-    id: randomString,
-    content: randomString,
-  };
-};
-
 export default function MessagesContainer({}: Props) {
+  const inputRef = React.useRef<HTMLInputElement>(null!);
+
   const [msgInput, setMessageInput] = useState("");
+  const [inputDisabled, setInputDisabled] = useState(false);
+  const inputWasDisabled = React.useRef(false);
 
   const messagesContainerRef = React.useRef<HTMLDivElement>(null!);
 
   const { messages: newMessages, submitMessage } = useChat();
-
   const [messages, setMessages] = useState<Message[]>(newMessages);
   const [shouldScroll, setShouldScroll] = useState(true);
 
@@ -47,29 +37,41 @@ export default function MessagesContainer({}: Props) {
     }
   }, [scrollToBottom, shouldScroll]);
 
+  useEffect(() => {
+    if (!inputDisabled && inputWasDisabled.current) {
+      inputRef.current.focus();
+      inputWasDisabled.current = false;
+    }
+  }, [inputDisabled]);
+
   const onSubmitMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     try {
+      setInputDisabled(true);
       await submitMessage(msgInput);
+
       setMessageInput("");
       setShouldScroll(true);
     } catch (error) {
       alert("Failed to submit message");
+    } finally {
+      inputWasDisabled.current = true;
+      setInputDisabled(false);
     }
   };
 
   return (
     <>
       <div
-        className="grow flex flex-col overflow-y-auto"
+        className="grow flex flex-col overflow-y-auto pr-8"
         ref={messagesContainerRef}
       >
-        <div className="flex flex-col-reverse grow gap-8 py-16">
+        <div className="flex flex-col grow gap-8 py-16">
           {messages.map((message) => (
             <div
               key={message.id}
               className={`flex flex-col gap-4 rounded-24 px-16 py-8 text-white ${
-                true
+                message.role === "user"
                   ? "self-start bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600 "
                   : "self-end bg-blue-600"
               }`}
@@ -80,15 +82,24 @@ export default function MessagesContainer({}: Props) {
         </div>
       </div>
       <form onSubmit={onSubmitMessage} className="">
-        <div className="flex gap-16 bg-gray-200 p-8 rounded-8 [&:has(input:focus)]:outline outline-gray-700 outline-2">
+        <div
+          className={`flex gap-16 bg-gray-200 p-8 rounded-8 [&:has(input:focus)]:outline outline-gray-700 outline-2 ${
+            inputDisabled && "opacity-70"
+          }`}
+        >
           <input
-            className="grow p-16 bg-transparent focus:outline-none"
+            ref={inputRef}
+            className="grow p-16 bg-transparent focus:outline-none "
             type="text"
             placeholder="Type your message here..."
             value={msgInput}
             onChange={(e) => setMessageInput(e.target.value)}
+            disabled={inputDisabled}
           />
-          <button className="bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600 text-body3 px-16 py-4 shrink-0 rounded-8 font-bold active:scale-90 text-white">
+          <button
+            disabled={inputDisabled}
+            className="bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600 text-body3 px-32 py-4 shrink-0 rounded-8 font-bold  active:scale-90 active:disabled:scale-100 text-white"
+          >
             Send Message
           </button>
         </div>

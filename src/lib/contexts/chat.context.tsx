@@ -1,9 +1,11 @@
 import { createContext, useState, useContext, useCallback } from "react";
 import { usePayment } from "./payment.context";
+import API from "../../api";
 
 export type Message = {
   id: string;
   content: string;
+  role: "user" | "bot";
 };
 
 interface ChatContext {
@@ -24,13 +26,25 @@ export const ChatContextProvider = ({
 
   const submitMessage = useCallback(
     async (message: string) => {
-      await requestPayment(100);
+      const { invoice } = await requestPayment(10);
+
       setMessages((prev) => [
         ...prev,
-        { id: Math.random().toString(), content: message },
+        { id: Math.random().toString(), content: message, role: "user" },
+      ]);
+
+      const chatbotResponse = await API.getChatbotResponse({
+        messages,
+        prompt: message,
+        invoice,
+      });
+
+      setMessages((prev) => [
+        ...prev,
+        { id: Math.random().toString(), content: chatbotResponse, role: "bot" },
       ]);
     },
-    [requestPayment]
+    [messages, requestPayment]
   );
 
   return (

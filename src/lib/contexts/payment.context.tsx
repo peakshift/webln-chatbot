@@ -6,44 +6,21 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { requestInvoice, utils } from "lnurl-pay";
+import { utils } from "lnurl-pay";
+import { useLocalStorage } from "usehooks-ts";
+import WebLN from "../services/webln";
+import API from "../../api";
 
 interface PaymentContext {
-  requestPayment: (amount: number) => Promise<void>;
+  requestPayment: (amount: number) => Promise<{ invoice: string }>;
   invoice: string;
 
   isPaymentModalOpen: boolean;
   closePaymentModal: () => void;
+  setPrefersPayImmediately: (prefersPayImmediately: boolean) => void;
 }
 
 const context = createContext<PaymentContext>(null!);
-
-const fetchInvoice = async (amount: number) => {
-  const {
-    invoice,
-    params,
-    successAction,
-    hasValidAmount,
-    hasValidDescriptionHash,
-    validatePreimage,
-  } = await requestInvoice({
-    lnUrlOrAddress: "mtg@getalby.com",
-    tokens: utils.toSats(amount), // in TS you can use utils.checkedToSats or utils.toSats
-  });
-
-  tempPaymentMap.set(invoice, false);
-  //   setTimeout(() => {
-  //     tempPaymentMap.set(invoice, true);
-  //   }, 10000);
-
-  return invoice;
-};
-
-const tempPaymentMap = new Map<string, boolean>();
-
-const isInvoicePaid = async (invoice: string) => {
-  return !!tempPaymentMap.get(invoice);
-};
 
 export const PaymentContextProvider = ({
   children,
@@ -52,25 +29,46 @@ export const PaymentContextProvider = ({
 }) => {
   const [invoice, setInvoice] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [prefersPayImmediately, setPrefersPayImmediately] = useLocalStorage(
+    "prefers-pay-immediately",
+    false
+  );
 
   const onPaymentSuccess = useRef<() => void>(() => {});
   const onPaymentFailure = useRef<() => void>(() => {});
 
-  const requestPayment = useCallback(async (amount: number) => {
-    // fetch invoice from backend
-    const invoice = await fetchInvoice(amount);
-    setInvoice(invoice);
-    // open modal
-    setPaymentModalOpen(true);
+  const requestPayment = useCallback(
+    async (amount: number) => {
+      // fetch invoice from backend
+      const invoice = await API.getInvoice({ amount });
+      setInvoice(invoice);
 
-    // wait for payment to be completed
-    // close modal
-    // return payment result to caller
-    return new Promise<void>((res, rej) => {
-      onPaymentSuccess.current = res;
-      onPaymentFailure.current = rej;
-    });
-  }, []);
+      const promise = new Promise<{ invoice: string }>((res, rej) => {
+        onPaymentSuccess.current = () => res({ invoice });
+        onPaymentFailure.current = rej;
+      });
+
+      if (prefersPayImmediately) {
+        // try first to pay with webln without showing the modal
+        await WebLN.sendPayment(invoice).catch(() => {
+          // if it fails for whatever reason, open modal
+          alert("Couldn't pay with WebLN");
+          setPaymentModalOpen(true);
+          setPrefersPayImmediately(false);
+        });
+      } else {
+        // open modal
+        console.log("open modal");
+        setPaymentModalOpen(true);
+      }
+
+      // wait for payment to be completed
+      // close modal
+      // return payment result to caller
+      return promise;
+    },
+    [prefersPayImmediately, setPrefersPayImmediately]
+  );
 
   const cancelPayment = useCallback(() => {
     setPaymentModalOpen(false);
@@ -79,10 +77,8 @@ export const PaymentContextProvider = ({
 
   useEffect(() => {
     if (invoice) {
-      setPaymentModalOpen(true);
-
       const interval = setInterval(async () => {
-        const isPaid = await isInvoicePaid(invoice);
+        const isPaid = await API.isInvoicePaid({ invoice });
         if (isPaid) {
           clearInterval(interval);
           setPaymentModalOpen(false);
@@ -105,6 +101,7 @@ export const PaymentContextProvider = ({
         isPaymentModalOpen: paymentModalOpen,
         invoice,
         closePaymentModal: cancelPayment,
+        setPrefersPayImmediately,
       }}
     >
       {children}
@@ -126,6 +123,16 @@ export const usePaymentModal = () => {
   if (!ctx) {
     throw new Error("useChat must be used within a PaymentContextProvider");
   }
-  const { isPaymentModalOpen, invoice, closePaymentModal } = ctx;
-  return { isPaymentModalOpen, invoice, closePaymentModal };
+  const {
+    isPaymentModalOpen,
+    invoice,
+    closePaymentModal,
+    setPrefersPayImmediately,
+  } = ctx;
+  return {
+    isPaymentModalOpen,
+    invoice,
+    closePaymentModal,
+    setPrefersPayImmediately,
+  };
 };

@@ -1,0 +1,11 @@
+[functions]
+  directory = "api/functions"
+
+[build]
+
+[dev]
+  framework = "#static"
+  publish = "dist"  
+ 
+
+ 

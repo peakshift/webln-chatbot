@@ -1,35 +1,51 @@
 import { requestInvoice, utils } from "lnurl-pay";
 import { Message } from "../lib/contexts/chat.context";
+import { Invoice, LightningAddress } from "alby-tools";
 
 const mockPaymentsMap = new Map<string, boolean>();
 
+const pendingPaymentsMap = new Map<
+  string,
+  {
+    paid: boolean;
+    verifyUrl: string;
+  }
+>();
+
+const ln = new LightningAddress("mtg@getalby.com");
+const lnDataPromise = ln.fetch();
+
 async function getInvoice({ amount }: { amount: number }) {
-  const {
-    invoice,
-    // params,
-    // successAction,
-    // hasValidAmount,
-    // hasValidDescriptionHash,
-    // validatePreimage,
-  } = await requestInvoice({
-    lnUrlOrAddress: "mtg@getalby.com",
-    tokens: utils.toSats(amount), // in TS you can use utils.checkedToSats or utils.toSats
+  await lnDataPromise;
+
+  const invoice = await ln.requestInvoice({
+    satoshi: amount,
+    comment: "Payment for chat prompt",
   });
 
-  mockPaymentsMap.set(invoice, false);
-  setTimeout(() => {
-    mockPaymentsMap.set(invoice, true);
-  }, 10000);
+  if (!invoice.verify) throw new Error("No verify url supported");
 
-  return invoice;
+  pendingPaymentsMap.set(invoice.paymentRequest, {
+    paid: false,
+    verifyUrl: invoice.verify,
+  });
+
+  // mockPaymentsMap.set(invoice.paymentHash, false);
+  // setTimeout(() => {
+  //   mockPaymentsMap.set(invoice.paymentHash, true);
+  // }, 10000);
+
+  return invoice.paymentRequest;
 }
 
-async function isInvoicePaid({ invoice }: { invoice: string }) {
-  const paid = mockPaymentsMap.get(invoice);
-  if (paid === undefined) {
-    throw new Error("Invoice not found");
-  }
-  return paid;
+async function isInvoicePaid({ invoice: pr }: { invoice: string }) {
+  const verifyUrl = pendingPaymentsMap.get(pr)?.verifyUrl;
+
+  if (!verifyUrl) throw new Error("No verify url found");
+
+  const { settled } = await fetch(verifyUrl).then((res) => res.json());
+
+  return !!settled;
 }
 
 async function getChatbotResponse({

@@ -1,3 +1,3 @@
 export const ENV = {
-  ApiUrl: import.meta.env.VITE_API_URL,
+  ApiUrl: import.meta.env.VITE_API_URL ?? "/.netlify/functions",
 };

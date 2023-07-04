@@ -1,8 +1,5 @@
-import { requestInvoice, utils } from "lnurl-pay";
 import { Message } from "../lib/contexts/chat.context";
-import { Invoice, LightningAddress } from "alby-tools";
-
-const mockPaymentsMap = new Map<string, boolean>();
+import { ENV } from "../utils/env";
 
 const pendingPaymentsMap = new Map<
   string,
@@ -12,51 +9,38 @@ const pendingPaymentsMap = new Map<
   }
 >();
 
-const ln = new LightningAddress("mtg@getalby.com");
-const lnDataPromise = ln.fetch();
-
 async function getInvoice({ amount }: { amount: number }) {
-  await lnDataPromise;
+  const { pr, paymentHash, verifyUrl } = await fetcher("/get-invoice");
 
-  const invoice = await ln.requestInvoice({
-    satoshi: amount,
-    comment: "Payment for chat prompt",
-  });
-
-  if (!invoice.verify) throw new Error("No verify url supported");
-
-  pendingPaymentsMap.set(invoice.paymentRequest, {
-    paid: false,
-    verifyUrl: invoice.verify,
-  });
-
-  // mockPaymentsMap.set(invoice.paymentHash, false);
-  // setTimeout(() => {
-  //   mockPaymentsMap.set(invoice.paymentHash, true);
-  // }, 10000);
-
-  return invoice.paymentRequest;
+  return { invoice: pr, paymentHash, verifyUrl };
 }
 
-async function isInvoicePaid({ invoice: pr }: { invoice: string }) {
-  const verifyUrl = pendingPaymentsMap.get(pr)?.verifyUrl;
+async function isInvoicePaid({ verifyUrl }: { verifyUrl: string }) {
+  const { settled, preimage } = (await fetch(verifyUrl).then((res) =>
+    res.json()
+  )) as { settled: boolean; preimage: string };
 
-  if (!verifyUrl) throw new Error("No verify url found");
-
-  const { settled } = await fetch(verifyUrl).then((res) => res.json());
-
-  return !!settled;
+  return { settled, preimage };
 }
 
 async function getChatbotResponse({
+  preimage,
   messages,
+  prompt,
 }: {
   messages: Message[];
   prompt: string;
-  invoice: string;
+  preimage: string;
 }) {
-  await delay();
-  return getRandomSentence();
+  const { response } = await fetcher("/chat", "POST", {
+    body: { messages, prompt },
+    headers: {
+      "Content-Type": "application/json",
+      preimage: preimage,
+    },
+  });
+
+  return { response };
 }
 
 export const API = {
@@ -66,6 +50,33 @@ export const API = {
 };
 
 export default API;
+
+function fetcher(
+  url: string,
+  method: "GET" | "POST" | "PUT" | "DELETE" = "GET",
+  options?: Partial<{ body: any; headers: any }>
+) {
+  return fetch(ENV.ApiUrl + url, {
+    method: method,
+    ...(options?.body && { body: JSON.stringify(options.body) }),
+    ...(options?.headers && { headers: options.headers }),
+  })
+    .then(async (response) => {
+      const data = await response.json();
+
+      // check for error response
+      if (!response.ok) {
+        // get error message from body or default to response status
+        const error = (data && data.message) || response.status;
+        return Promise.reject(error);
+      }
+
+      return data;
+    })
+    .catch((error) => {
+      throw error;
+    });
+}
 
 function delay() {
   return new Promise((resolve) => setTimeout(resolve, 1500));

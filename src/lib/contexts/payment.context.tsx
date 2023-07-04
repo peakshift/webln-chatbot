@@ -6,13 +6,12 @@ import {
   useEffect,
   useRef,
 } from "react";
-import { utils } from "lnurl-pay";
 import { useLocalStorage } from "usehooks-ts";
 import WebLN from "../services/webln";
 import API from "../../api";
 
 interface PaymentContext {
-  requestPayment: (amount: number) => Promise<{ invoice: string }>;
+  requestPayment: (amount: number) => Promise<{ preimage: string }>;
   invoice: string;
 
   isPaymentModalOpen: boolean;
@@ -28,24 +27,34 @@ export const PaymentContextProvider = ({
   children: React.ReactNode;
 }) => {
   const [invoice, setInvoice] = useState("");
+  const [verifyUrl, setVerifyUrl] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
   const [prefersPayImmediately, setPrefersPayImmediately] = useLocalStorage(
     "prefers-pay-immediately",
     false
   );
 
-  const onPaymentSuccess = useRef<() => void>(() => {});
+  const onPaymentSuccess = useRef<(preimage: string) => void>(() => {});
   const onPaymentFailure = useRef<() => void>(() => {});
 
   const requestPayment = useCallback(
     async (amount: number) => {
       // fetch invoice from backend
-      const invoice = await API.getInvoice({ amount });
+      const { invoice, verifyUrl } = await API.getInvoice({ amount });
       setInvoice(invoice);
+      setVerifyUrl(verifyUrl);
 
-      const promise = new Promise<{ invoice: string }>((res, rej) => {
-        onPaymentSuccess.current = () => res({ invoice });
-        onPaymentFailure.current = rej;
+      const promise = new Promise<{ preimage: string }>((res, rej) => {
+        onPaymentSuccess.current = (preimage: string) => {
+          setInvoice("");
+          setVerifyUrl("");
+          res({ preimage });
+        };
+        onPaymentFailure.current = () => {
+          setInvoice("");
+          setVerifyUrl("");
+          rej();
+        };
       });
 
       if (prefersPayImmediately) {
@@ -58,7 +67,6 @@ export const PaymentContextProvider = ({
         });
       } else {
         // open modal
-        console.log("open modal");
         setPaymentModalOpen(true);
       }
 
@@ -76,13 +84,15 @@ export const PaymentContextProvider = ({
   }, []);
 
   useEffect(() => {
-    if (invoice) {
+    if (verifyUrl) {
       const interval = setInterval(async () => {
-        const isPaid = await API.isInvoicePaid({ invoice });
+        const { settled: isPaid, preimage } = await API.isInvoicePaid({
+          verifyUrl,
+        });
         if (isPaid) {
           clearInterval(interval);
           setPaymentModalOpen(false);
-          onPaymentSuccess.current();
+          onPaymentSuccess.current(preimage);
         }
       }, 2000);
 
@@ -92,7 +102,7 @@ export const PaymentContextProvider = ({
     } else {
       setPaymentModalOpen(false);
     }
-  }, [invoice]);
+  }, [verifyUrl]);
 
   return (
     <context.Provider

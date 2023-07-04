@@ -26,17 +26,17 @@ export const ChatContextProvider = ({
 
   const submitMessage = useCallback(
     async (message: string) => {
-      const { invoice } = await requestPayment(10);
+      const { preimage } = await requestPayment(10);
 
       setMessages((prev) => [
         ...prev,
         { id: Math.random().toString(), content: message, role: "user" },
       ]);
 
-      const chatbotResponse = await API.getChatbotResponse({
+      const { response: chatbotResponse } = await API.getChatbotResponse({
         messages,
         prompt: message,
-        invoice,
+        preimage,
       });
 
       setMessages((prev) => [

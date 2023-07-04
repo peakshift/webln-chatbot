@@ -7,7 +7,6 @@ const connectDB = async () => {
   if (!ENV.MONGO_URI) throw new Error("Missing MONGO_URI env var");
 
   await mongoose.connect(ENV.MONGO_URI);
-  console.log("db connected..!");
 };
 
 const Schema = mongoose.Schema;

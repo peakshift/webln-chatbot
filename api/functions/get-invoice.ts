@@ -1,8 +1,7 @@
 import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
 import { LightningAddress } from "alby-tools";
-import { requestInvoice, utils } from "lnurl-pay";
 import { DB } from "../lib/db";
-// import { DB } from "../lib/db";
+import { createResponse } from "../lib/helpers";
 
 const getInvoice: Handler = async (
   event: HandlerEvent,
@@ -20,14 +19,13 @@ const getInvoice: Handler = async (
 
   await DB.addInvoice(invoice.paymentHash);
 
-  return {
-    statusCode: 200,
-    body: JSON.stringify({
+  return createResponse({
+    body: {
       pr: invoice.paymentRequest,
       paymentHash: invoice.paymentHash,
       verifyUrl: invoice.verify,
-    }),
-  };
+    },
+  });
 };
 
 export const handler = getInvoice;

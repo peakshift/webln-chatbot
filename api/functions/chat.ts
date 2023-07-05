@@ -1,38 +1,25 @@
-import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
 import { SHA256, enc } from "crypto-js";
 import { DB } from "../lib/db";
 import { createResponse } from "../lib/helpers";
-import { CORS_HEADERS } from "../lib/constants";
 import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from "openai";
 import ENV from "../lib/env";
+import { createExpressApp } from "../lib/express-router";
+import ServerlessHttp from "serverless-http";
+import express, { Request, Response, Express } from "express";
 
 const configuration = new Configuration({
   apiKey: ENV.OPENAI_API_KEY,
 });
 const openai = new OpenAIApi(configuration);
 
-const chat: Handler = async (event: HandlerEvent, context: HandlerContext) => {
-  if (event.httpMethod === "OPTIONS") {
-    return {
-      statusCode: 200,
-      headers: CORS_HEADERS,
-    };
-  }
-
-  if (event.httpMethod !== "POST") {
-    return createResponse({
-      statusCode: 405,
-      body: "Method Not Allowed",
-    });
-  }
-
-  const { messages, prompt } = JSON.parse(event.body || "{}") as {
+const chat = async (req: Request, res: Response) => {
+  const { messages, prompt } = req.body as {
     messages: ChatCompletionRequestMessage[];
     prompt: string;
   };
-  const preimage = event.headers["preimage"];
+  const preimage = req.headers["preimage"];
 
-  if (!preimage) {
+  if (typeof preimage !== "string") {
     return createResponse({
       statusCode: 400,
       body: "Missing preimage from header",
@@ -45,9 +32,8 @@ const chat: Handler = async (event: HandlerEvent, context: HandlerContext) => {
   const foundInvoice = await DB.getInvoice(paymentHash);
 
   if (!foundInvoice) {
-    return createResponse({
-      statusCode: 400,
-      body: "Invalid preimage",
+    return res.status(400).json({
+      error: "Invoice not found",
     });
   }
 
@@ -72,11 +58,8 @@ const chat: Handler = async (event: HandlerEvent, context: HandlerContext) => {
 
     await DB.removeInvoice(foundInvoice.hash!);
 
-    return createResponse({
-      statusCode: 200,
-      body: {
-        response: chatCompletion.data.choices[0].message?.content,
-      },
+    return res.status(200).json({
+      response: chatCompletion.data.choices[0].message?.content,
     });
   } catch (error) {
     if (error.response) {
@@ -86,13 +69,24 @@ const chat: Handler = async (event: HandlerEvent, context: HandlerContext) => {
       console.log(error.message);
     }
 
-    return createResponse({
-      statusCode: 500,
-      body: {
-        error: error.message,
-      },
+    return res.status(500).json({
+      error: error.message,
     });
   }
 };
 
-export const handler = chat;
+let app: Express;
+
+if (process.env.LOCAL) {
+  app = createExpressApp();
+  app.post("/chat", chat);
+} else {
+  const router = express.Router();
+  router.post("/chat", chat);
+  app = createExpressApp(router);
+}
+
+export const handler = async (event, context) => {
+  const serverlessHandler = ServerlessHttp(app);
+  return await serverlessHandler(event, context);
+};

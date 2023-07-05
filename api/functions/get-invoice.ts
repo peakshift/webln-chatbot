@@ -1,12 +1,11 @@
-import type { Handler, HandlerEvent, HandlerContext } from "@netlify/functions";
 import { LightningAddress } from "alby-tools";
 import { DB } from "../lib/db";
-import { convertUSDToSats, createResponse } from "../lib/helpers";
+import { convertUSDToSats } from "../lib/helpers";
+import { createExpressApp } from "../lib/express-router";
+import ServerlessHttp from "serverless-http";
+import express, { Request, Response } from "express";
 
-const getInvoice: Handler = async (
-  event: HandlerEvent,
-  context: HandlerContext
-) => {
+const getInvoice = async (req: Request, res: Response) => {
   const ln = new LightningAddress("mtg@getalby.com");
   await ln.fetch();
 
@@ -23,14 +22,26 @@ const getInvoice: Handler = async (
 
   await DB.addInvoice(invoice.paymentHash);
 
-  return createResponse({
-    body: {
-      pr: invoice.paymentRequest,
-      paymentHash: invoice.paymentHash,
-      verifyUrl: invoice.verify,
-      amountInSats: amount,
-    },
+  return res.status(200).json({
+    pr: invoice.paymentRequest,
+    paymentHash: invoice.paymentHash,
+    verifyUrl: invoice.verify,
+    amountInSats: amount,
   });
 };
 
-export const handler = getInvoice;
+let app;
+
+if (process.env.LOCAL) {
+  app = createExpressApp();
+  app.get("/get-invoice", getInvoice);
+} else {
+  const router = express.Router();
+  router.get("/get-invoice", getInvoice);
+  app = createExpressApp(router);
+}
+
+export const handler = async (event, context) => {
+  const serverlessHandler = ServerlessHttp(app);
+  return await serverlessHandler(event, context);
+};

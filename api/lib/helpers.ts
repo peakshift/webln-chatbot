@@ -17,3 +17,13 @@ export const createResponse = (
     },
   };
 };
+
+export async function convertUSDToSats(usd: number) {
+  const amountInBTC = await fetch(
+    `https://blockchain.info/tobtc?currency=USD&value=${usd}`
+  )
+    .then((res) => res.text())
+    .then((res) => Number(res));
+
+  return amountInBTC * 100_000_000;
+}

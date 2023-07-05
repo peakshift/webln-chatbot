@@ -1,14 +1,6 @@
 import { Message } from "../lib/contexts/chat.context";
 import { ENV } from "../utils/env";
 
-const pendingPaymentsMap = new Map<
-  string,
-  {
-    paid: boolean;
-    verifyUrl: string;
-  }
->();
-
 async function getInvoice({ amount }: { amount: number }) {
   const { pr, paymentHash, verifyUrl } = await fetcher("/get-invoice");
 

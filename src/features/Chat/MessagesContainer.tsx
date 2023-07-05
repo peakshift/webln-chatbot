@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from "react";
 import { Message, useChat } from "../../lib/contexts/chat.context";
+import { useSubmitMessage } from "./useSubmitMessage";
 
 interface Props {}
 
@@ -12,7 +13,10 @@ export default function MessagesContainer({}: Props) {
 
   const messagesContainerRef = React.useRef<HTMLDivElement>(null!);
 
-  const { messages: newMessages, submitMessage } = useChat();
+  const { messages: newMessages } = useChat();
+
+  const submitMessageMutation = useSubmitMessage();
+
   const [messages, setMessages] = useState<Message[]>(newMessages);
   const [shouldScroll, setShouldScroll] = useState(true);
 
@@ -48,7 +52,7 @@ export default function MessagesContainer({}: Props) {
     e.preventDefault();
     try {
       setInputDisabled(true);
-      await submitMessage(msgInput);
+      await submitMessageMutation.submit(msgInput);
 
       setMessageInput("");
       setShouldScroll(true);
@@ -63,14 +67,14 @@ export default function MessagesContainer({}: Props) {
   return (
     <>
       <div
-        className="grow flex flex-col overflow-y-auto pr-8"
+        className="grow flex flex-col overflow-y-auto pr-8 "
         ref={messagesContainerRef}
       >
         <div className="flex flex-col grow gap-8 py-16">
           {messages.map((message) => (
             <div
               key={message.id}
-              className={`flex flex-col gap-4 rounded-24 px-16 py-8 text-white ${
+              className={`flex flex-col max-w-[min(90%,700px)] gap-4 rounded-24 px-16 py-8 text-white whitespace-pre-line ${
                 message.role === "user"
                   ? "self-start bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600 "
                   : "self-end bg-blue-600"
@@ -100,7 +104,11 @@ export default function MessagesContainer({}: Props) {
             disabled={inputDisabled}
             className="bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600 text-body3 px-32 py-4 shrink-0 rounded-8 font-bold  active:scale-90 active:disabled:scale-100 text-white"
           >
-            Send Message
+            {submitMessageMutation.currentState === "fetching-invoice"
+              ? "Fetching invoice..."
+              : submitMessageMutation.currentState === "getting-response"
+              ? "Generating response..."
+              : "Send Message"}
           </button>
         </div>
       </form>

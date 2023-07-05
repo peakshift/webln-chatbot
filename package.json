@@ -1,5 +1,5 @@
 {
-  "name": "nostr-workshop",
+  "name": "webln-chatbot-workshop",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -14,14 +14,12 @@
   },
   "dependencies": {
     "@netlify/functions": "^1.6.0",
-    "@nostr-connect/connect": "^0.4.0",
-    "@prisma/client": "^4.16.2",
     "alby-tools": "^3.0.0",
     "crypto": "^1.0.1",
     "crypto-js": "^4.1.1",
     "lnurl-pay": "^2.3.0",
     "mongoose": "^7.3.1",
-    "nostr-tools": "^1.7.4",
+    "openai": "^3.3.0",
     "react": "^18.2.0",
     "react-copy-to-clipboard": "^5.1.0",
     "react-dom": "^18.2.0",
@@ -29,7 +27,6 @@
     "react-modal": "^3.16.1",
     "react-qr-code": "^2.0.11",
     "react-router-dom": "^6.9.0",
-    "redis-om": "^0.3.6",
     "use-debounce": "^9.0.3",
     "use-state-persist": "^0.3.1",
     "usehooks-ts": "^2.9.1"

@@ -13,11 +13,22 @@ const configuration = new Configuration({
 const openai = new OpenAIApi(configuration);
 
 const chat = async (req: Request, res: Response) => {
+  // Check if the user can make this request (has the header token, it still has enough remaining requests/tokens/time/...etc)
+
+  // if NOT, return 402 with an invoice for some default package (like a 1000 tokens package)
+
+  // if YES, continue as normal
+
   const { messages, prompt } = req.body as {
     messages: ChatCompletionRequestMessage[];
     prompt: string;
   };
-  const preimage = req.headers["preimage"];
+
+  /*** 
+  
+ ### Old code from the pay-per-prompt version, just for reference (feel free to delete it after you write your implementation)
+  
+ const preimage = req.headers["preimage"];
 
   if (typeof preimage !== "string") {
     return createResponse({
@@ -36,6 +47,8 @@ const chat = async (req: Request, res: Response) => {
       error: "Invoice not found",
     });
   }
+ 
+ */
 
   try {
     const chatCompletion = await openai.createChatCompletion({
@@ -56,7 +69,12 @@ const chat = async (req: Request, res: Response) => {
       ],
     });
 
-    await DB.removeInvoice(foundInvoice.hash!);
+    /**
+     
+      In the pay-per-prompt version, I'm just removing the invoice after the user pays it. In packages case however, we will instead decrease some amount
+     
+      await DB.removeInvoice(foundInvoice.hash!); 
+     */
 
     return res.status(200).json({
       response: chatCompletion.data.choices[0].message?.content,

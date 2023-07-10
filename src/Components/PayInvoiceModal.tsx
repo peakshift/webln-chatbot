@@ -121,7 +121,7 @@ export default function PayInvoiceModal() {
             >
               <span>Copy Invoice</span> <FiCopy />
             </button>
-            {WebLN.isSupported && (
+            {isPaymentModalOpen && WebLN.isSupported && (
               <button
                 className="bg-violet-500 hover:bg-violet-600 font-medium text-white p-12 rounded-12 mt-32 flex items-center gap-8"
                 onClick={payWithWebln}

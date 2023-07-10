@@ -1,7 +1,7 @@
 import { Message } from "../lib/contexts/chat.context";
 import { ENV } from "../utils/env";
 
-async function getInvoice({ amount }: { amount: number }) {
+async function getInvoice({ amount }: { amount?: number }) {
   const { pr, paymentHash, verifyUrl } = await fetcher("/get-invoice");
 
   return { invoice: pr, paymentHash, verifyUrl };

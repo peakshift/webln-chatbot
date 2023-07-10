@@ -11,11 +11,12 @@ import WebLN from "../services/webln";
 import API from "../../api";
 
 interface PaymentContext {
-  requestPayment: (amount: number) => Promise<{ preimage: string }>;
+  requestPayment: (amount?: number) => Promise<{ preimage: string }>;
   invoice: string;
 
   isPaymentModalOpen: boolean;
   closePaymentModal: () => void;
+  prefersPayImmediately: boolean;
   setPrefersPayImmediately: (prefersPayImmediately: boolean) => void;
 }
 
@@ -38,7 +39,7 @@ export const PaymentContextProvider = ({
   const onPaymentFailure = useRef<() => void>(() => {});
 
   const requestPayment = useCallback(
-    async (amount: number) => {
+    async (amount?: number) => {
       // fetch invoice from backend
       const { invoice, verifyUrl } = await API.getInvoice({ amount });
       setInvoice(invoice);
@@ -111,6 +112,7 @@ export const PaymentContextProvider = ({
         isPaymentModalOpen: paymentModalOpen,
         invoice,
         closePaymentModal: cancelPayment,
+        prefersPayImmediately,
         setPrefersPayImmediately,
       }}
     >
@@ -137,12 +139,14 @@ export const usePaymentModal = () => {
     isPaymentModalOpen,
     invoice,
     closePaymentModal,
+    prefersPayImmediately,
     setPrefersPayImmediately,
   } = ctx;
   return {
     isPaymentModalOpen,
     invoice,
     closePaymentModal,
+    prefersPayImmediately,
     setPrefersPayImmediately,
   };
 };

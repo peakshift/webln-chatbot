@@ -41,7 +41,7 @@ export const ChatContextProvider = ({
 
       onStatusUpdate("fetching-invoice");
 
-      const { preimage } = await requestPayment(10);
+      const { preimage } = await requestPayment();
 
       onStatusUpdate("invoice-paid");
 

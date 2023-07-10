@@ -11,7 +11,7 @@ import WebLN from "../services/webln";
 import API from "../../api";
 
 interface PaymentContext {
-  requestPayment: (amount: number) => Promise<{ preimage: string }>;
+  requestPayment: (amount?: number) => Promise<{ preimage: string }>;
   invoice: string;
 
   isPaymentModalOpen: boolean;
@@ -39,7 +39,7 @@ export const PaymentContextProvider = ({
   const onPaymentFailure = useRef<() => void>(() => {});
 
   const requestPayment = useCallback(
-    async (amount: number) => {
+    async (amount?: number) => {
       // fetch invoice from backend
       const { invoice, verifyUrl } = await API.getInvoice({ amount });
       setInvoice(invoice);

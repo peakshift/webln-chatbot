@@ -16,6 +16,7 @@ interface PaymentContext {
 
   isPaymentModalOpen: boolean;
   closePaymentModal: () => void;
+  prefersPayImmediately: boolean;
   setPrefersPayImmediately: (prefersPayImmediately: boolean) => void;
 }
 
@@ -111,6 +112,7 @@ export const PaymentContextProvider = ({
         isPaymentModalOpen: paymentModalOpen,
         invoice,
         closePaymentModal: cancelPayment,
+        prefersPayImmediately,
         setPrefersPayImmediately,
       }}
     >
@@ -137,12 +139,14 @@ export const usePaymentModal = () => {
     isPaymentModalOpen,
     invoice,
     closePaymentModal,
+    prefersPayImmediately,
     setPrefersPayImmediately,
   } = ctx;
   return {
     isPaymentModalOpen,
     invoice,
     closePaymentModal,
+    prefersPayImmediately,
     setPrefersPayImmediately,
   };
 };

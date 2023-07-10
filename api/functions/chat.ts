@@ -76,6 +76,21 @@ const chat = async (req: Request, res: Response) => {
       await DB.removeInvoice(foundInvoice.hash!); 
      */
 
+    /**
+      Also, it would be great if you can return to me some kind of value indicating how much this token still has remaining.
+      For example: {
+        response: 'whatever-here',
+        remaining:{
+          tokens: 832,
+          // Or
+          requests: 12,
+        }
+      }
+
+      So that I can show something in the UI like "You have 832 tokens remaining" or "You have 12 requests remaining".
+      
+      */
+
     return res.status(200).json({
       response: chatCompletion.data.choices[0].message?.content,
     });

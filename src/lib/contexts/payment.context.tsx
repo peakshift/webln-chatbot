@@ -12,6 +12,7 @@ import API from "../../api";
 
 interface PaymentContext {
   requestPayment: (amount?: number) => Promise<{ preimage: string }>;
+  requestPaymentToken: () => Promise<{ token: string }>;
   invoice: string;
 
   isPaymentModalOpen: boolean;
@@ -34,6 +35,8 @@ export const PaymentContextProvider = ({
     "prefers-pay-immediately",
     false
   );
+
+  const [paymentToken, setPaymentToken] = useLocalStorage("payment-token", "");
 
   const onPaymentSuccess = useRef<(preimage: string) => void>(() => {});
   const onPaymentFailure = useRef<() => void>(() => {});
@@ -79,6 +82,56 @@ export const PaymentContextProvider = ({
     [prefersPayImmediately, setPrefersPayImmediately]
   );
 
+  const requestPaymentToken = useCallback(async () => {
+    // check if I already have a payment token
+
+    // if yes, make sure it's still valid
+
+    // if not
+    // show "Choose a package" modal
+
+    // fetch invoice from backend
+
+    // show normal invoice modal
+
+    // upon user paying, return payment token
+
+    const { invoice, verifyUrl } = await API.getInvoice({ amount: 10 });
+    setInvoice(invoice);
+    setVerifyUrl(verifyUrl);
+
+    const promise = new Promise<{ token: string }>((res, rej) => {
+      onPaymentSuccess.current = (token: string) => {
+        setInvoice("");
+        setVerifyUrl("");
+        res({ token });
+      };
+      onPaymentFailure.current = () => {
+        setInvoice("");
+        setVerifyUrl("");
+        rej();
+      };
+    });
+
+    if (prefersPayImmediately) {
+      // try first to pay with webln without showing the modal
+      await WebLN.sendPayment(invoice).catch(() => {
+        // if it fails for whatever reason, open modal
+        alert("Couldn't pay with WebLN");
+        setPaymentModalOpen(true);
+        setPrefersPayImmediately(false);
+      });
+    } else {
+      // open modal
+      setPaymentModalOpen(true);
+    }
+
+    // wait for payment to be completed
+    // close modal
+    // return payment result to caller
+    return promise;
+  }, [prefersPayImmediately, setPrefersPayImmediately]);
+
   const cancelPayment = useCallback(() => {
     setPaymentModalOpen(false);
     onPaymentFailure.current();
@@ -114,6 +167,7 @@ export const PaymentContextProvider = ({
         closePaymentModal: cancelPayment,
         prefersPayImmediately,
         setPrefersPayImmediately,
+        requestPaymentToken,
       }}
     >
       {children}

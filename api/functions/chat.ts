@@ -1,4 +1,8 @@
-import { generateInvoice, isValidPaymentToken } from "../lib/helpers";
+import {
+  generateInvoice,
+  generateToken,
+  isValidPaymentToken,
+} from "../lib/helpers";
 import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from "openai";
 import ENV from "../lib/env";
 import { createExpressApp } from "../lib/express-router";
@@ -28,19 +32,31 @@ const chat = async (req: Request, res: Response) => {
 
   if (!isPaymentValid) {
     // if NOT, return 402 with an invoice for some default package (like a 1000 tokens package)
-    const invoice = await generateInvoice({ amount: 100 });
 
+    // extract 'packageId' from query params
+    const packageId = req.query.packageId ?? "1";
+
+    const amount = 100; // or get the amount from the DB based on the packageId
+
+    const invoice = await generateInvoice({
+      amount,
+      comment: "Payment for chatbot package",
+    });
+
+    const jwt = await generateToken(invoice, req.originalUrl);
     // Store it in the DB for verification later
     // TODO
 
     res.set({
-      "www-authenticate": `LSAT macaroon=${123},invoice=${
-        invoice.paymentRequest
-      }`,
+      "www-authenticate": `LSAT macaroon=${jwt},invoice=${invoice.paymentRequest}`,
     });
-    return res
-      .status(402)
-      .json({ invoice: invoice.paymentRequest, macaroon: invoice.paymentHash });
+    return res.status(402).json({
+      invoice: invoice.paymentRequest,
+      paymentHash: invoice.paymentHash,
+      verifyUrl: invoice.verify,
+      amountInSats: amount,
+      macaroon: jwt,
+    });
   }
 
   // if valid, continue as normal

@@ -34,16 +34,18 @@ export async function convertUSDToSats(usd: number) {
 export async function generateInvoice({
   amount = 100,
   ln_address = "mtg@getably.com",
+  comment = "",
 }: {
   amount?: number;
   ln_address?: string;
+  comment?: string;
 }) {
   const ln = new AlbyTools.LightningAddress(ln_address);
   await ln.fetch();
 
   const invoice = await ln.requestInvoice({
     satoshi: amount,
-    comment: "Payment for chat prompt",
+    comment,
   });
 
   if (!invoice.verify)
@@ -77,4 +79,14 @@ export async function isValidPaymentToken(token, preimage, path) {
   // AND that this token still has some requests left
 
   return isPaid;
+}
+
+export async function generateToken(invoice, path) {
+  const jwt = await new jose.SignJWT({ pr: invoice.paymentRequest, path: path })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("2h")
+    .sign(Buffer.from(ENV.JWT_SECRET));
+
+  return jwt;
 }

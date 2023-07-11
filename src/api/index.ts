@@ -1,10 +1,17 @@
 import { Message } from "../lib/contexts/chat.context";
 import { ENV } from "../utils/env";
 
-async function getInvoice({ amount }: { amount?: number }) {
-  const { pr, paymentHash, verifyUrl } = await fetcher("/get-invoice");
+async function getInvoice(
+  options?: { amount: number } | { packageId: number }
+) {
+  const queryParams = new URLSearchParams(options as any).toString();
 
-  return { invoice: pr, paymentHash, verifyUrl };
+  const { pr, paymentHash, verifyUrl, macaroon } = await fetcher(
+    "/chat?" + queryParams,
+    "POST"
+  );
+
+  return { invoice: pr, paymentHash, verifyUrl, macaroon };
 }
 
 async function isInvoicePaid({ verifyUrl }: { verifyUrl: string }) {

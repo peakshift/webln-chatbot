@@ -33,35 +33,51 @@ export const ChatContextProvider = ({
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
 
-  const { requestPayment } = usePayment();
+  const { requestPaymentToken, revokePaymentToken } = usePayment();
 
   const submitMessage = useCallback<ChatContext["submitMessage"]>(
     async (message: string, options) => {
       const onStatusUpdate = options?.onStatusUpdate || (() => {});
 
-      onStatusUpdate("fetching-invoice");
+      const getPaymentToken = async () => {
+        onStatusUpdate("fetching-invoice");
 
-      const { preimage } = await requestPayment();
+        const { token } = await requestPaymentToken();
 
-      onStatusUpdate("invoice-paid");
+        onStatusUpdate("invoice-paid");
 
-      setMessages((prev) => [
-        ...prev,
-        { id: Math.random().toString(), content: message, role: "user" },
-      ]);
+        return token;
+      };
+
+      const tryFetchResponse = async (token: string) =>
+        API.getChatbotResponse({
+          messages,
+          prompt: message,
+          preimage: token,
+        }).then(({ response }) => response);
 
       onStatusUpdate("fetching-response");
 
-      const { response: chatbotResponse } = await API.getChatbotResponse({
-        messages,
-        prompt: message,
-        preimage,
-      });
+      let chatbotResponse: string;
+      try {
+        const token = await getPaymentToken();
+        chatbotResponse = await tryFetchResponse(token);
+      } catch (error) {
+        if ((error as any).response.status === 402) {
+          revokePaymentToken();
+
+          const token = await getPaymentToken();
+          chatbotResponse = await tryFetchResponse(token);
+        } else {
+          throw error;
+        }
+      }
 
       onStatusUpdate("response-fetched");
 
       setMessages((prev) => [
         ...prev,
+        { id: Math.random().toString(), content: message, role: "user" },
         {
           id: Math.random().toString(),
           content: chatbotResponse,
@@ -69,7 +85,7 @@ export const ChatContextProvider = ({
         },
       ]);
     },
-    [messages, requestPayment]
+    [messages, requestPaymentToken, revokePaymentToken]
   );
 
   return (

@@ -42,6 +42,7 @@ export const PaymentContextProvider = ({
     async (amount?: number) => {
       // fetch invoice from backend
       const { invoice, verifyUrl } = await API.getInvoice({ amount });
+
       setInvoice(invoice);
       setVerifyUrl(verifyUrl);
 

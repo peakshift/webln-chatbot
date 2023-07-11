@@ -44,7 +44,7 @@ const chat = async (req: Request, res: Response) => {
         {
           role: "system",
           content:
-            "You are a funny chatbot how always replies in rhythms. But try to keep your replies around 1-3 paragraphs.",
+            "You are a funny chatbot who always replies in rhythms. But try to keep your replies around 1-3 paragraphs.",
         },
         ...messages
           .filter((msg) => msg.role === "user" || msg.role === "assistant")

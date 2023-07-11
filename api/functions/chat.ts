@@ -21,13 +21,8 @@ const chat = async (req: Request, res: Response) => {
   let isPaymentValid = false;
 
   if (authHeader) {
-    console.info(`Auth header present`);
     const [token, preimage] = authHeader.replace("LSAT ", "").split(":");
-    isPaymentValid = await isValidPaymentToken(
-      token,
-      preimage,
-      req.originalUrl
-    );
+    isPaymentValid = await isValidPaymentToken(token, preimage);
   }
 
   if (!isPaymentValid) {
@@ -37,13 +32,12 @@ const chat = async (req: Request, res: Response) => {
     const packageId = req.query.packageId ?? "1";
 
     const amount = 100; // or get the amount from the DB based on the packageId
-
     const invoice = await generateInvoice({
       amount,
       comment: "Payment for chatbot package",
     });
 
-    const jwt = await generateToken(invoice, req.originalUrl);
+    const jwt = await generateToken(invoice);
     // Store it in the DB for verification later
     // TODO
 

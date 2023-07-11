@@ -5,7 +5,7 @@ import { useSubmitMessage } from "./useSubmitMessage";
 interface Props {}
 
 export default function MessagesContainer({}: Props) {
-  const inputRef = React.useRef<HTMLTextAreaElement>(null!);
+  const inputRef = React.useRef<HTMLInputElement>(null!);
 
   const [msgInput, setMessageInput] = useState("");
   const [inputDisabled, setInputDisabled] = useState(false);
@@ -90,11 +90,11 @@ export default function MessagesContainer({}: Props) {
       </div>
       <form onSubmit={onSubmitMessage} className="">
         <div
-          className={`flex items-end flex-wrap gap-16 bg-gray-200 p-8 rounded-8 [&:has(input:focus)]:outline outline-gray-700 outline-2 ${
+          className={`flex flex-wrap gap-16 bg-gray-200 p-8 rounded-8 [&:has(input:focus)]:outline outline-gray-700 outline-2 ${
             inputDisabled && "opacity-70"
           }`}
         >
-          <textarea
+          <input
             ref={inputRef}
             className="grow p-16 bg-transparent focus:outline-none "
             placeholder={
@@ -102,7 +102,6 @@ export default function MessagesContainer({}: Props) {
                 ? "What's on your mind?..."
                 : "Type your message here..."
             }
-            rows={2}
             value={msgInput}
             onChange={(e) => setMessageInput(e.target.value)}
             disabled={inputDisabled}

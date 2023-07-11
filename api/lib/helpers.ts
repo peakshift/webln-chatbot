@@ -1,7 +1,7 @@
 import { HandlerResponse } from "@netlify/functions";
 import { CORS_HEADERS } from "../lib/constants";
-import AlbyTools from "alby-tools";
-import jose from "jose";
+import * as AlbyTools from "alby-tools";
+import * as jose from "jose";
 import ENV from "./env";
 
 export const createResponse = (
@@ -33,7 +33,7 @@ export async function convertUSDToSats(usd: number) {
 
 export async function generateInvoice({
   amount = 100,
-  ln_address = "mtg@getably.com",
+  ln_address = "mtg@getalby.com",
   comment = "",
 }: {
   amount?: number;
@@ -54,15 +54,12 @@ export async function generateInvoice({
   return invoice;
 }
 
-export async function isValidPaymentToken(token, preimage, path) {
+export async function isValidPaymentToken(token, preimage) {
   let jwt;
   try {
     jwt = await jose.jwtVerify(token, Buffer.from(ENV.JWT_SECRET), {});
   } catch (e) {
     console.error(e);
-    return false;
-  }
-  if (path !== jwt.payload.path) {
     return false;
   }
   if (Math.floor(Date.now() / 1000) > jwt.payload.exp) {
@@ -72,6 +69,7 @@ export async function isValidPaymentToken(token, preimage, path) {
     pr: jwt.payload.pr,
     preimage: preimage,
   });
+
   const isPaid = await invoice.isPaid();
 
   // TODO
@@ -81,11 +79,11 @@ export async function isValidPaymentToken(token, preimage, path) {
   return isPaid;
 }
 
-export async function generateToken(invoice, path) {
-  const jwt = await new jose.SignJWT({ pr: invoice.paymentRequest, path: path })
+export async function generateToken(invoice) {
+  const jwt = await new jose.SignJWT({ pr: invoice.paymentRequest })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("2h")
+    .setExpirationTime("720h")
     .sign(Buffer.from(ENV.JWT_SECRET));
 
   return jwt;

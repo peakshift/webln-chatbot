@@ -13,7 +13,7 @@ import API from "../../api";
 interface PaymentContext {
   requestPayment: (
     options: PaymentRequestOptions
-  ) => Promise<{ preimage: string }>;
+  ) => Promise<{ preimage: string; paymentToken: string }>;
   requestPaymentToken: () => Promise<{ token: string }>;
   invoice: string;
 
@@ -62,22 +62,26 @@ export const PaymentContextProvider = ({
       if (!prefersPayImmediately) setPaymentModalOpen(true);
 
       // fetch invoice from backend
-      const { invoice, verifyUrl } = await API.getInvoice(options);
+      const { invoice, verifyUrl, macaroon } = await API.getInvoice(options);
+
       setInvoice(invoice);
       setVerifyUrl(verifyUrl);
 
-      const promise = new Promise<{ preimage: string }>((res, rej) => {
-        onPaymentSuccess.current = (preimage: string) => {
-          setInvoice("");
-          setVerifyUrl("");
-          res({ preimage });
-        };
-        onPaymentFailure.current = () => {
-          setInvoice("");
-          setVerifyUrl("");
-          rej();
-        };
-      });
+      const promise = new Promise<{ preimage: string; paymentToken: string }>(
+        (res, rej) => {
+          onPaymentSuccess.current = (preimage: string) => {
+            setInvoice("");
+            setVerifyUrl("");
+            const paymentToken = `LSAT ${macaroon}:${preimage}`;
+            res({ preimage, paymentToken });
+          };
+          onPaymentFailure.current = () => {
+            setInvoice("");
+            setVerifyUrl("");
+            rej();
+          };
+        }
+      );
 
       if (prefersPayImmediately) {
         // try first to pay with webln without showing the modal

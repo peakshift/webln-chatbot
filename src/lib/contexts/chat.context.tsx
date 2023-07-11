@@ -53,7 +53,7 @@ export const ChatContextProvider = ({
         API.getChatbotResponse({
           messages,
           prompt: message,
-          preimage: token,
+          token,
         }).then(({ response }) => response);
 
       onStatusUpdate("fetching-response");

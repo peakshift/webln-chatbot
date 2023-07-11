@@ -6,12 +6,12 @@ async function getInvoice(
 ) {
   const queryParams = new URLSearchParams(options as any).toString();
 
-  const { pr, paymentHash, verifyUrl, macaroon } = await fetcher(
+  const { invoice, paymentHash, verifyUrl, macaroon } = await fetcher(
     "/chat?" + queryParams,
     "POST"
   );
 
-  return { invoice: pr, paymentHash, verifyUrl, macaroon };
+  return { invoice, paymentHash, verifyUrl, macaroon };
 }
 
 async function isInvoicePaid({ verifyUrl }: { verifyUrl: string }) {
@@ -23,19 +23,19 @@ async function isInvoicePaid({ verifyUrl }: { verifyUrl: string }) {
 }
 
 async function getChatbotResponse({
-  preimage,
+  token,
   messages,
   prompt,
 }: {
   messages: Message[];
   prompt: string;
-  preimage: string;
+  token: string;
 }) {
   const { response } = await fetcher("/chat", "POST", {
     body: { messages, prompt },
     headers: {
       "Content-Type": "application/json",
-      preimage: preimage,
+      Authorization: token,
     },
   });
 
@@ -64,7 +64,7 @@ function fetcher(
       const data = await response.json();
 
       // check for error response
-      if (!response.ok) {
+      if (!response.ok && response.status !== 402) {
         // get error message from body or default to response status
         const error = (data && data.message) || response.status;
         return Promise.reject(error);

@@ -1,6 +1,4 @@
-import { SHA256, enc } from "crypto-js";
-import { DB } from "../lib/db";
-import { createResponse } from "../lib/helpers";
+import { generateInvoice, isValidPaymentToken } from "../lib/helpers";
 import { ChatCompletionRequestMessage, Configuration, OpenAIApi } from "openai";
 import ENV from "../lib/env";
 import { createExpressApp } from "../lib/express-router";
@@ -14,41 +12,43 @@ const openai = new OpenAIApi(configuration);
 
 const chat = async (req: Request, res: Response) => {
   // Check if the user can make this request (has the header token, it still has enough remaining requests/tokens/time/...etc)
+  const authHeader = req.get("Authorization");
 
-  // if NOT, return 402 with an invoice for some default package (like a 1000 tokens package)
+  let isPaymentValid = false;
 
-  // if YES, continue as normal
+  if (authHeader) {
+    console.info(`Auth header present`);
+    const [token, preimage] = authHeader.replace("LSAT ", "").split(":");
+    isPaymentValid = await isValidPaymentToken(
+      token,
+      preimage,
+      req.originalUrl
+    );
+  }
+
+  if (!isPaymentValid) {
+    // if NOT, return 402 with an invoice for some default package (like a 1000 tokens package)
+    const invoice = await generateInvoice({ amount: 100 });
+
+    // Store it in the DB for verification later
+    // TODO
+
+    res.set({
+      "www-authenticate": `LSAT macaroon=${123},invoice=${
+        invoice.paymentRequest
+      }`,
+    });
+    return res
+      .status(402)
+      .json({ invoice: invoice.paymentRequest, macaroon: invoice.paymentHash });
+  }
+
+  // if valid, continue as normal
 
   const { messages, prompt } = req.body as {
     messages: ChatCompletionRequestMessage[];
     prompt: string;
   };
-
-  /*** 
-  
- ### Old code from the pay-per-prompt version, just for reference (feel free to delete it after you write your implementation)
-  
- const preimage = req.headers["preimage"];
-
-  if (typeof preimage !== "string") {
-    return createResponse({
-      statusCode: 400,
-      body: "Missing preimage from header",
-    });
-  }
-
-  const hash = SHA256(enc.Hex.parse(preimage));
-  const paymentHash = hash.toString();
-
-  const foundInvoice = await DB.getInvoice(paymentHash);
-
-  if (!foundInvoice) {
-    return res.status(400).json({
-      error: "Invoice not found",
-    });
-  }
- 
- */
 
   try {
     const chatCompletion = await openai.createChatCompletion({
@@ -70,14 +70,7 @@ const chat = async (req: Request, res: Response) => {
     });
 
     /**
-     
-      In the pay-per-prompt version, I'm just removing the invoice after the user pays it. In packages case however, we will instead decrease some amount
-     
-      await DB.removeInvoice(foundInvoice.hash!); 
-     */
-
-    /**
-      Also, it would be great if you can return to me some kind of value indicating how much this token still has remaining.
+      It would be great if you can return to the client some kind of value indicating how much this token still has remaining.
       For example: {
         response: 'whatever-here',
         remaining:{

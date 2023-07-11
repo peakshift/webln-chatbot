@@ -3,6 +3,7 @@ import { CORS_HEADERS } from "../lib/constants";
 import * as AlbyTools from "alby-tools";
 import * as jose from "jose";
 import ENV from "./env";
+import { DB } from "./db";
 
 export const createResponse = (
   args: Partial<HandlerResponse & { body: any }>
@@ -54,6 +55,11 @@ export async function generateInvoice({
   return invoice;
 }
 
+export function tokensToSats(tokens: number) {
+  const priceInUSD = (tokens * 0.002) / 1000;
+  return convertUSDToSats(priceInUSD);
+}
+
 export async function isValidPaymentToken(token, preimage) {
   let jwt;
   try {
@@ -72,11 +78,13 @@ export async function isValidPaymentToken(token, preimage) {
 
   const isPaid = await invoice.isPaid();
 
-  // TODO
-  // Check also in the DB to make sure this invoice hasn't already been used before
-  // AND that this token still has some requests left
+  if (!isPaid) return false;
 
-  return isPaid;
+  const hasEnoughValue = await DB.tokenHasValue(token);
+
+  if (!hasEnoughValue) return false;
+
+  return true;
 }
 
 export async function generateToken(invoice) {

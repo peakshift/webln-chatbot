@@ -47,6 +47,9 @@ export const PaymentContextProvider = ({
   );
 
   const [paymentToken, setPaymentToken] = useLocalStorage("payment-token", "");
+  const paymentTokenRef = useRef<string>(paymentToken);
+
+  paymentTokenRef.current = paymentToken;
 
   const onPaymentSuccess = useRef<(preimage: string) => void>(() => {});
   const onPaymentFailure = useRef<() => void>(() => {});
@@ -102,6 +105,7 @@ export const PaymentContextProvider = ({
   );
 
   const requestPaymentToken = useCallback(async () => {
+    const paymentToken = paymentTokenRef.current;
     // check if I already have a payment token
     // if yes, make sure it's still valid (but how??)
     if (paymentToken) return { token: paymentToken };
@@ -126,7 +130,7 @@ export const PaymentContextProvider = ({
     // close modal
     // return payment result to caller
     return promise;
-  }, [paymentToken]);
+  }, []);
 
   const cancelPayment = useCallback(() => {
     setPaymentModalOpen(false);
@@ -139,6 +143,7 @@ export const PaymentContextProvider = ({
   }, []);
 
   const revokePaymentToken = useCallback(() => {
+    paymentTokenRef.current = "";
     setPaymentToken("");
   }, [setPaymentToken]);
 

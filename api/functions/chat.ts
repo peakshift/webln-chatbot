@@ -8,6 +8,8 @@ import ENV from "../lib/env";
 import { createExpressApp } from "../lib/express-router";
 import ServerlessHttp from "serverless-http";
 import express, { Request, Response, Express } from "express";
+import { packages } from "../lib/constants";
+import { DB } from "../lib/db";
 
 const configuration = new Configuration({
   apiKey: ENV.OPENAI_API_KEY,
@@ -20,26 +22,36 @@ const chat = async (req: Request, res: Response) => {
 
   let isPaymentValid = false;
 
+  let paymentToken = "";
+
   if (authHeader) {
     const [token, preimage] = authHeader.replace("LSAT ", "").split(":");
+    paymentToken = token;
     isPaymentValid = await isValidPaymentToken(token, preimage);
   }
 
   if (!isPaymentValid) {
-    // if NOT, return 402 with an invoice for some default package (like a 1000 tokens package)
+    const packageId = Number.isNaN(Number(req.query.packageId))
+      ? packages[0].id
+      : Number(req.query.packageId);
+    const chosenPackage = packages.find((p) => p.id === packageId);
 
-    // extract 'packageId' from query params
-    const packageId = req.query.packageId ?? "1";
+    if (!chosenPackage) {
+      return res.status(400).json({
+        error: "Invalid packageId",
+      });
+    }
 
-    const amount = 100; // or get the amount from the DB based on the packageId
+    const amount = await chosenPackage.getPackagePrice();
+
     const invoice = await generateInvoice({
       amount,
-      comment: "Payment for chatbot package",
+      comment: `Payment for chatbot ${chosenPackage.name}`,
     });
 
     const jwt = await generateToken(invoice);
-    // Store it in the DB for verification later
-    // TODO
+
+    await DB.addToken(jwt, "tokens", chosenPackage.value);
 
     res.set({
       "www-authenticate": `LSAT macaroon=${jwt},invoice=${invoice.paymentRequest}`,
@@ -52,8 +64,6 @@ const chat = async (req: Request, res: Response) => {
       macaroon: jwt,
     });
   }
-
-  // if valid, continue as normal
 
   const { messages, prompt } = req.body as {
     messages: ChatCompletionRequestMessage[];
@@ -79,6 +89,11 @@ const chat = async (req: Request, res: Response) => {
       ],
     });
 
+    const remainingValue = await DB.decreaseTokenValue(
+      paymentToken,
+      chatCompletion.data.usage?.total_tokens ?? 4000
+    );
+
     /**
       It would be great if you can return to the client some kind of value indicating how much this token still has remaining.
       For example: {
@@ -96,6 +111,10 @@ const chat = async (req: Request, res: Response) => {
 
     return res.status(200).json({
       response: chatCompletion.data.choices[0].message?.content,
+      remaining: {
+        unit: "tokens",
+        value: remainingValue,
+      },
     });
   } catch (error) {
     if (error.response) {

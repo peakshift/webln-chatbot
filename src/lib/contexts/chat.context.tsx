@@ -63,7 +63,9 @@ export const ChatContextProvider = ({
         const token = await getPaymentToken();
         chatbotResponse = await tryFetchResponse(token);
       } catch (error) {
-        if ((error as any).response.status === 402) {
+        console.log(error);
+        if ((error as any).status === 402) {
+          console.log("ERERE");
           revokePaymentToken();
 
           const token = await getPaymentToken();

@@ -9,7 +9,10 @@ async function getInvoice(
   const { invoice, paymentHash, verifyUrl, macaroon } = await fetcher(
     "/chat?" + queryParams,
     "POST"
-  );
+  ).catch((err) => {
+    if (err.status === 402) {
+    }
+  });
 
   return { invoice, paymentHash, verifyUrl, macaroon };
 }
@@ -64,10 +67,10 @@ function fetcher(
       const data = await response.json();
 
       // check for error response
-      if (!response.ok && response.status !== 402) {
+      if (!response.ok) {
         // get error message from body or default to response status
-        const error = (data && data.message) || response.status;
-        return Promise.reject(error);
+        const errMessage = data && data.message;
+        return Promise.reject({ message: errMessage, status: response.status });
       }
 
       return data;

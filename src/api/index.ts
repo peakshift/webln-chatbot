@@ -11,7 +11,9 @@ async function getInvoice(
     "POST"
   ).catch((err) => {
     if (err.status === 402) {
-    }
+      console.log(err.data);
+      return err.data;
+    } else throw err;
   });
 
   return { invoice, paymentHash, verifyUrl, macaroon };
@@ -69,8 +71,10 @@ function fetcher(
       // check for error response
       if (!response.ok) {
         // get error message from body or default to response status
-        const errMessage = data && data.message;
-        return Promise.reject({ message: errMessage, status: response.status });
+        return Promise.reject({
+          data,
+          status: response.status,
+        });
       }
 
       return data;
@@ -78,30 +82,4 @@ function fetcher(
     .catch((error) => {
       throw error;
     });
-}
-
-function delay() {
-  return new Promise((resolve) => setTimeout(resolve, 1500));
-}
-
-function getRandomSentence() {
-  const sentences = [
-    "What's your favorite color?",
-    "Have you seen any good movies lately?",
-    "Do you have any pets?",
-    "What's your favorite food?",
-    "Did you watch the game last night?",
-    "What's your favorite book?",
-    "Do you enjoy cooking?",
-    "Have you ever traveled outside the country?",
-    "What's your favorite season?",
-    "Do you play any musical instruments?",
-    "What's your dream job?",
-    "Have you been to any concerts recently?",
-    "Do you like hiking?",
-    "What's your favorite type of music?",
-    "Have you ever gone skydiving?",
-  ];
-  const index = Math.floor(Math.random() * (sentences.length - 1));
-  return sentences[index];
 }

@@ -18,6 +18,7 @@ export const createExpressApp = (router?: any) => {
     cors({
       origin: "*",
       credentials: true,
+      exposedHeaders: "*"
     })
   );
 

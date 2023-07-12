@@ -50,6 +50,9 @@ export default function MessagesContainer({}: Props) {
 
   const onSubmitMessage = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
+    if (msgInput.trim() === "") return;
+
     try {
       setInputDisabled(true);
       await submitMessageMutation.submit(msgInput);
@@ -87,22 +90,25 @@ export default function MessagesContainer({}: Props) {
       </div>
       <form onSubmit={onSubmitMessage} className="">
         <div
-          className={`flex gap-16 bg-gray-200 p-8 rounded-8 [&:has(input:focus)]:outline outline-gray-700 outline-2 ${
+          className={`flex flex-wrap gap-16 bg-gray-200 p-8 rounded-8 [&:has(input:focus)]:outline outline-gray-700 outline-2 ${
             inputDisabled && "opacity-70"
           }`}
         >
           <input
             ref={inputRef}
             className="grow p-16 bg-transparent focus:outline-none "
-            type="text"
-            placeholder="Type your message here..."
+            placeholder={
+              messages.length === 0
+                ? "What's on your mind?..."
+                : "Type your message here..."
+            }
             value={msgInput}
             onChange={(e) => setMessageInput(e.target.value)}
             disabled={inputDisabled}
           />
           <button
             disabled={inputDisabled}
-            className="bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600 text-body3 px-32 py-4 shrink-0 rounded-8 font-bold  active:scale-90 active:disabled:scale-100 text-white"
+            className="max-md:grow bg-gradient-to-br from-indigo-500 via-purple-500 to-purple-600 text-body3 px-32 py-8 shrink-0 rounded-8 font-bold  active:scale-90 active:disabled:scale-100 text-white"
           >
             {submitMessageMutation.currentState === "fetching-invoice"
               ? "Fetching invoice..."

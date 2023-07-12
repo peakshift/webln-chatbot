@@ -1,5 +1,9 @@
 import { HandlerResponse } from "@netlify/functions";
 import { CORS_HEADERS } from "../lib/constants";
+import * as AlbyTools from "alby-tools";
+import * as jose from "jose";
+import ENV from "./env";
+import { DB } from "./db";
 
 export const createResponse = (
   args: Partial<HandlerResponse & { body: any }>
@@ -26,4 +30,69 @@ export async function convertUSDToSats(usd: number) {
     .then((res) => Number(res));
 
   return amountInBTC * 100_000_000;
+}
+
+export async function generateInvoice({
+  amount = 100,
+  ln_address = "mtg@getalby.com",
+  comment = "",
+}: {
+  amount?: number;
+  ln_address?: string;
+  comment?: string;
+}) {
+  const ln = new AlbyTools.LightningAddress(ln_address);
+  await ln.fetch();
+
+  const invoice = await ln.requestInvoice({
+    satoshi: amount,
+    comment,
+  });
+
+  if (!invoice.verify)
+    throw new Error("No verify url supported by this ln address provider");
+
+  return invoice;
+}
+
+export function tokensToSats(tokens: number) {
+  const priceInUSD = (tokens * 0.002) / 1000;
+  return convertUSDToSats(priceInUSD);
+}
+
+export async function isValidPaymentToken(token, preimage) {
+  let jwt;
+  try {
+    jwt = await jose.jwtVerify(token, Buffer.from(ENV.JWT_SECRET), {});
+  } catch (e) {
+    console.error(e);
+    return false;
+  }
+  if (Math.floor(Date.now() / 1000) > jwt.payload.exp) {
+    return false; // expired
+  }
+  const invoice = new AlbyTools.Invoice({
+    pr: jwt.payload.pr,
+    preimage: preimage,
+  });
+
+  const isPaid = await invoice.isPaid();
+
+  if (!isPaid) return false;
+
+  const hasEnoughValue = await DB.tokenHasValue(token);
+
+  if (!hasEnoughValue) return false;
+
+  return true;
+}
+
+export async function generateToken(invoice) {
+  const jwt = await new jose.SignJWT({ pr: invoice.paymentRequest })
+    .setProtectedHeader({ alg: "HS256" })
+    .setIssuedAt()
+    .setExpirationTime("720h")
+    .sign(Buffer.from(ENV.JWT_SECRET));
+
+  return jwt;
 }

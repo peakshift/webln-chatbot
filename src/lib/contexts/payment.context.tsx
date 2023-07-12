@@ -181,10 +181,16 @@ export const PaymentContextProvider = ({
   useEffect(() => {
     if (!paymentToken) updateValueRemainingInToken(-1);
 
-    API.getTokenRemainingValue(paymentToken).then(({ value }) => {
-      updateValueRemainingInToken(value);
-    });
-  }, [paymentToken, updateValueRemainingInToken]);
+    API.getTokenRemainingValue(paymentToken)
+      .then(({ value }) => {
+        updateValueRemainingInToken(value);
+      })
+      .catch((err) => {
+        if (err.data.error === "Invalid token") {
+          revokePaymentToken();
+        }
+      });
+  }, [paymentToken, revokePaymentToken, updateValueRemainingInToken]);
 
   useEffect(() => {
     if (paymentToken) {

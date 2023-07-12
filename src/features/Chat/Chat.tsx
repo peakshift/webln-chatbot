@@ -1,4 +1,5 @@
 import { FiCopy, FiShoppingCart } from "react-icons/fi";
+import { CiExport, CiImport } from "react-icons/ci";
 import { usePayment } from "../../lib/contexts/payment.context";
 import useCopyToClipboard from "../../lib/hooks/useCopyToClipboard";
 import MessagesContainer from "./MessagesContainer";
@@ -49,8 +50,8 @@ export default function DirectMessaging() {
               aria-label="copy invoice"
               onClick={handleCopyToken}
             >
-              Copy token
-              <FiCopy />
+              Export token
+              <CiExport />
             </button>
           </>
         ) : (
@@ -72,8 +73,8 @@ export default function DirectMessaging() {
                 aria-label="copy invoice"
                 onClick={handlePasteToken}
               >
-                Paste token
-                <FiCopy />
+                Import token
+                <CiImport />
               </button>
             </div>
           </>

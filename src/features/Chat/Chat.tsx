@@ -16,7 +16,6 @@ export default function DirectMessaging() {
 
   const handleCopyToken = () => {
     copyToClipBoard(paymentToken);
-    alert("Copied token to clipboard!");
   };
 
   const handlePasteToken = () => {

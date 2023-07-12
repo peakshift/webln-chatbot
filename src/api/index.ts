@@ -1,10 +1,22 @@
 import { Message } from "../lib/contexts/chat.context";
 import { ENV } from "../utils/env";
 
-async function getInvoice({ amount }: { amount: number }) {
-  const { pr, paymentHash, verifyUrl } = await fetcher("/get-invoice");
+async function getInvoice(
+  options?: { amount: number } | { packageId: number }
+) {
+  const queryParams = new URLSearchParams(options as any).toString();
 
-  return { invoice: pr, paymentHash, verifyUrl };
+  const { invoice, paymentHash, verifyUrl, macaroon } = await fetcher(
+    "/chat?" + queryParams,
+    "POST"
+  ).catch((err) => {
+    if (err.status === 402) {
+      console.log(err.data);
+      return err.data;
+    } else throw err;
+  });
+
+  return { invoice, paymentHash, verifyUrl, macaroon };
 }
 
 async function isInvoicePaid({ verifyUrl }: { verifyUrl: string }) {
@@ -16,29 +28,40 @@ async function isInvoicePaid({ verifyUrl }: { verifyUrl: string }) {
 }
 
 async function getChatbotResponse({
-  preimage,
+  token,
   messages,
   prompt,
 }: {
   messages: Message[];
   prompt: string;
-  preimage: string;
+  token: string;
 }) {
-  const { response } = await fetcher("/chat", "POST", {
+  const { response, remaining } = await fetcher("/chat", "POST", {
     body: { messages, prompt },
     headers: {
       "Content-Type": "application/json",
-      preimage: preimage,
+      Authorization: token,
     },
   });
 
-  return { response };
+  return { response, remaining };
+}
+
+async function getTokenRemainingValue(token: string) {
+  const { remaining } = await fetcher("/token-value", "GET", {
+    headers: {
+      Authorization: token,
+    },
+  });
+
+  return remaining;
 }
 
 export const API = {
   getInvoice,
   isInvoicePaid,
   getChatbotResponse,
+  getTokenRemainingValue,
 };
 
 export default API;
@@ -59,8 +82,10 @@ function fetcher(
       // check for error response
       if (!response.ok) {
         // get error message from body or default to response status
-        const error = (data && data.message) || response.status;
-        return Promise.reject(error);
+        return Promise.reject({
+          data,
+          status: response.status,
+        });
       }
 
       return data;
@@ -68,30 +93,4 @@ function fetcher(
     .catch((error) => {
       throw error;
     });
-}
-
-function delay() {
-  return new Promise((resolve) => setTimeout(resolve, 1500));
-}
-
-function getRandomSentence() {
-  const sentences = [
-    "What's your favorite color?",
-    "Have you seen any good movies lately?",
-    "Do you have any pets?",
-    "What's your favorite food?",
-    "Did you watch the game last night?",
-    "What's your favorite book?",
-    "Do you enjoy cooking?",
-    "Have you ever traveled outside the country?",
-    "What's your favorite season?",
-    "Do you play any musical instruments?",
-    "What's your dream job?",
-    "Have you been to any concerts recently?",
-    "Do you like hiking?",
-    "What's your favorite type of music?",
-    "Have you ever gone skydiving?",
-  ];
-  const index = Math.floor(Math.random() * (sentences.length - 1));
-  return sentences[index];
 }

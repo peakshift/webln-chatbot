@@ -33,43 +33,65 @@ export const ChatContextProvider = ({
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
 
-  const { requestPayment } = usePayment();
+  const {
+    requestPaymentToken,
+    revokePaymentToken,
+    updateValueRemainingInToken,
+  } = usePayment();
 
   const submitMessage = useCallback<ChatContext["submitMessage"]>(
     async (message: string, options) => {
       const onStatusUpdate = options?.onStatusUpdate || (() => {});
 
-      onStatusUpdate("fetching-invoice");
+      const getPaymentToken = async () => {
+        onStatusUpdate("fetching-invoice");
 
-      const { preimage } = await requestPayment(10);
+        const { token } = await requestPaymentToken();
 
-      onStatusUpdate("invoice-paid");
+        onStatusUpdate("invoice-paid");
+
+        return token;
+      };
+
+      const tryFetchResponse = async (token: string) =>
+        API.getChatbotResponse({
+          messages,
+          prompt: message,
+          token,
+        });
+
+      onStatusUpdate("fetching-response");
+
+      let chatbotResponse: Awaited<ReturnType<typeof tryFetchResponse>>;
+      try {
+        const token = await getPaymentToken();
+        chatbotResponse = await tryFetchResponse(token);
+      } catch (error) {
+        if ((error as any).status === 402) {
+          revokePaymentToken();
+
+          const token = await getPaymentToken();
+          chatbotResponse = await tryFetchResponse(token);
+        } else {
+          throw error;
+        }
+      }
+
+      onStatusUpdate("response-fetched");
+
+      updateValueRemainingInToken(chatbotResponse.remaining.value);
 
       setMessages((prev) => [
         ...prev,
         { id: Math.random().toString(), content: message, role: "user" },
-      ]);
-
-      onStatusUpdate("fetching-response");
-
-      const { response: chatbotResponse } = await API.getChatbotResponse({
-        messages,
-        prompt: message,
-        preimage,
-      });
-
-      onStatusUpdate("response-fetched");
-
-      setMessages((prev) => [
-        ...prev,
         {
           id: Math.random().toString(),
-          content: chatbotResponse,
+          content: chatbotResponse.response,
           role: "assistant",
         },
       ]);
     },
-    [messages, requestPayment]
+    [messages, requestPaymentToken, revokePaymentToken]
   );
 
   return (

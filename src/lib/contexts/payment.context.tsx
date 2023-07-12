@@ -11,13 +11,27 @@ import WebLN from "../services/webln";
 import API from "../../api";
 
 interface PaymentContext {
-  requestPayment: (amount: number) => Promise<{ preimage: string }>;
+  requestPayment: (
+    options: PaymentRequestOptions
+  ) => Promise<{ preimage: string; paymentToken: string }>;
+  requestPaymentToken: () => Promise<{ token: string }>;
   invoice: string;
 
   isPaymentModalOpen: boolean;
+  isChoosePackageModalOpen: boolean;
   closePaymentModal: () => void;
+  closeChoosePackageModal: () => void;
+  prefersPayImmediately: boolean;
   setPrefersPayImmediately: (prefersPayImmediately: boolean) => void;
+  paymentToken: string;
+  setPaymentToken: (token: string) => void;
+  revokePaymentToken: () => void;
+
+  valueRemainingInToken: number;
+  updateValueRemainingInToken: (newValue: number) => void;
 }
+
+export type PaymentRequestOptions = { amount: number } | { packageId: number };
 
 const context = createContext<PaymentContext>(null!);
 
@@ -29,33 +43,54 @@ export const PaymentContextProvider = ({
   const [invoice, setInvoice] = useState("");
   const [verifyUrl, setVerifyUrl] = useState("");
   const [paymentModalOpen, setPaymentModalOpen] = useState(false);
+  const [choosePackageModalOpen, setChoosePackageModalOpen] = useState(false);
+
   const [prefersPayImmediately, setPrefersPayImmediately] = useLocalStorage(
     "prefers-pay-immediately",
     false
   );
 
+  const [paymentToken, setPaymentToken] = useLocalStorage("payment-token", "");
+  const [valueRemainingInToken, setValueRemainingInToken] = useState(-1);
+
+  const paymentTokenRef = useRef<string>(paymentToken);
+
+  paymentTokenRef.current = paymentToken;
+
   const onPaymentSuccess = useRef<(preimage: string) => void>(() => {});
   const onPaymentFailure = useRef<() => void>(() => {});
 
+  const onGetPaymentTokenSuccess = useRef<(token: string) => void>(() => {});
+  const onGetPaymentTokenFailure = useRef<() => void>(() => {});
+
   const requestPayment = useCallback(
-    async (amount: number) => {
+    async (options: { amount: number } | { packageId: number }) => {
+      setInvoice("");
+      setVerifyUrl("");
+
+      if (!prefersPayImmediately) setPaymentModalOpen(true);
+
       // fetch invoice from backend
-      const { invoice, verifyUrl } = await API.getInvoice({ amount });
+      const { invoice, verifyUrl, macaroon } = await API.getInvoice(options);
+
       setInvoice(invoice);
       setVerifyUrl(verifyUrl);
 
-      const promise = new Promise<{ preimage: string }>((res, rej) => {
-        onPaymentSuccess.current = (preimage: string) => {
-          setInvoice("");
-          setVerifyUrl("");
-          res({ preimage });
-        };
-        onPaymentFailure.current = () => {
-          setInvoice("");
-          setVerifyUrl("");
-          rej();
-        };
-      });
+      const promise = new Promise<{ preimage: string; paymentToken: string }>(
+        (res, rej) => {
+          onPaymentSuccess.current = (preimage: string) => {
+            setInvoice("");
+            setVerifyUrl("");
+            const paymentToken = `LSAT ${macaroon}:${preimage}`;
+            res({ preimage, paymentToken });
+          };
+          onPaymentFailure.current = () => {
+            setInvoice("");
+            setVerifyUrl("");
+            rej();
+          };
+        }
+      );
 
       if (prefersPayImmediately) {
         // try first to pay with webln without showing the modal
@@ -65,9 +100,6 @@ export const PaymentContextProvider = ({
           setPaymentModalOpen(true);
           setPrefersPayImmediately(false);
         });
-      } else {
-        // open modal
-        setPaymentModalOpen(true);
       }
 
       // wait for payment to be completed
@@ -78,10 +110,52 @@ export const PaymentContextProvider = ({
     [prefersPayImmediately, setPrefersPayImmediately]
   );
 
+  const requestPaymentToken = useCallback(async () => {
+    const paymentToken = paymentTokenRef.current;
+    // check if I already have a payment token
+    // if yes, make sure it's still valid (but how??)
+    if (paymentToken) return { token: paymentToken };
+
+    // if not
+    // show "Choose a package" modal
+    setChoosePackageModalOpen(true);
+
+    const promise = new Promise<{ token: string }>((res, rej) => {
+      onGetPaymentTokenSuccess.current = (token: string) => {
+        setInvoice("");
+        setVerifyUrl("");
+        res({ token });
+      };
+      onPaymentFailure.current = () => {
+        setInvoice("");
+        setVerifyUrl("");
+        rej();
+      };
+    });
+
+    // close modal
+    // return payment result to caller
+    return promise;
+  }, []);
+
   const cancelPayment = useCallback(() => {
     setPaymentModalOpen(false);
     onPaymentFailure.current();
   }, []);
+
+  const closeChoosePackageModal = useCallback(() => {
+    setChoosePackageModalOpen(false);
+    onGetPaymentTokenFailure.current();
+  }, []);
+
+  const updateValueRemainingInToken = useCallback((newValue: number) => {
+    setValueRemainingInToken(Math.max(-1, newValue));
+  }, []);
+
+  const revokePaymentToken = useCallback(() => {
+    paymentTokenRef.current = "";
+    setPaymentToken("");
+  }, [setPaymentToken]);
 
   useEffect(() => {
     if (verifyUrl) {
@@ -104,14 +178,40 @@ export const PaymentContextProvider = ({
     }
   }, [verifyUrl]);
 
+  useEffect(() => {
+    if (!paymentToken) updateValueRemainingInToken(-1);
+
+    API.getTokenRemainingValue(paymentToken).then(({ value }) => {
+      updateValueRemainingInToken(value);
+    });
+  }, [paymentToken, updateValueRemainingInToken]);
+
+  useEffect(() => {
+    if (paymentToken) {
+      onGetPaymentTokenSuccess.current(paymentToken);
+      onGetPaymentTokenSuccess.current = () => {};
+      onGetPaymentTokenFailure.current = () => {};
+      setChoosePackageModalOpen(false);
+    }
+  }, [paymentToken]);
+
   return (
     <context.Provider
       value={{
         requestPayment,
         isPaymentModalOpen: paymentModalOpen,
+        isChoosePackageModalOpen: choosePackageModalOpen,
         invoice,
         closePaymentModal: cancelPayment,
+        closeChoosePackageModal,
+        prefersPayImmediately,
         setPrefersPayImmediately,
+        requestPaymentToken,
+        paymentToken,
+        setPaymentToken,
+        revokePaymentToken,
+        valueRemainingInToken,
+        updateValueRemainingInToken,
       }}
     >
       {children}
@@ -124,8 +224,24 @@ export const usePayment = () => {
   if (!ctx) {
     throw new Error("useChat must be used within a PaymentContextProvider");
   }
-  const { requestPayment } = ctx;
-  return { requestPayment };
+  const {
+    requestPayment,
+    requestPaymentToken,
+    revokePaymentToken,
+    paymentToken,
+    setPaymentToken,
+    valueRemainingInToken,
+    updateValueRemainingInToken,
+  } = ctx;
+  return {
+    requestPayment,
+    requestPaymentToken,
+    revokePaymentToken,
+    paymentToken,
+    setPaymentToken,
+    valueRemainingInToken,
+    updateValueRemainingInToken,
+  };
 };
 
 export const usePaymentModal = () => {
@@ -135,14 +251,20 @@ export const usePaymentModal = () => {
   }
   const {
     isPaymentModalOpen,
+    isChoosePackageModalOpen,
     invoice,
     closePaymentModal,
+    closeChoosePackageModal,
+    prefersPayImmediately,
     setPrefersPayImmediately,
   } = ctx;
   return {
     isPaymentModalOpen,
+    isChoosePackageModalOpen,
     invoice,
     closePaymentModal,
+    closeChoosePackageModal,
+    prefersPayImmediately,
     setPrefersPayImmediately,
   };
 };

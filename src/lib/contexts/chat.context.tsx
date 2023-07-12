@@ -33,7 +33,11 @@ export const ChatContextProvider = ({
 }) => {
   const [messages, setMessages] = useState<Message[]>([]);
 
-  const { requestPaymentToken, revokePaymentToken } = usePayment();
+  const {
+    requestPaymentToken,
+    revokePaymentToken,
+    updateValueRemainingInToken,
+  } = usePayment();
 
   const submitMessage = useCallback<ChatContext["submitMessage"]>(
     async (message: string, options) => {
@@ -54,18 +58,16 @@ export const ChatContextProvider = ({
           messages,
           prompt: message,
           token,
-        }).then(({ response }) => response);
+        });
 
       onStatusUpdate("fetching-response");
 
-      let chatbotResponse: string;
+      let chatbotResponse: Awaited<ReturnType<typeof tryFetchResponse>>;
       try {
         const token = await getPaymentToken();
         chatbotResponse = await tryFetchResponse(token);
       } catch (error) {
-        console.log(error);
         if ((error as any).status === 402) {
-          console.log("ERERE");
           revokePaymentToken();
 
           const token = await getPaymentToken();
@@ -77,12 +79,14 @@ export const ChatContextProvider = ({
 
       onStatusUpdate("response-fetched");
 
+      updateValueRemainingInToken(chatbotResponse.remaining.value);
+
       setMessages((prev) => [
         ...prev,
         { id: Math.random().toString(), content: message, role: "user" },
         {
           id: Math.random().toString(),
-          content: chatbotResponse,
+          content: chatbotResponse.response,
           role: "assistant",
         },
       ]);

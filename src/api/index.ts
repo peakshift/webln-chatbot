@@ -36,7 +36,7 @@ async function getChatbotResponse({
   prompt: string;
   token: string;
 }) {
-  const { response } = await fetcher("/chat", "POST", {
+  const { response, remaining } = await fetcher("/chat", "POST", {
     body: { messages, prompt },
     headers: {
       "Content-Type": "application/json",
@@ -44,13 +44,24 @@ async function getChatbotResponse({
     },
   });
 
-  return { response };
+  return { response, remaining };
+}
+
+async function getTokenRemainingValue(token: string) {
+  const { remaining } = await fetcher("/token-value", "GET", {
+    headers: {
+      Authorization: token,
+    },
+  });
+
+  return remaining;
 }
 
 export const API = {
   getInvoice,
   isInvoicePaid,
   getChatbotResponse,
+  getTokenRemainingValue,
 };
 
 export default API;

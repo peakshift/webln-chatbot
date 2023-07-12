@@ -23,8 +23,12 @@ interface PaymentContext {
   closeChoosePackageModal: () => void;
   prefersPayImmediately: boolean;
   setPrefersPayImmediately: (prefersPayImmediately: boolean) => void;
+  paymentToken: string;
   setPaymentToken: (token: string) => void;
   revokePaymentToken: () => void;
+
+  valueRemainingInToken: number;
+  updateValueRemainingInToken: (newValue: number) => void;
 }
 
 export type PaymentRequestOptions = { amount: number } | { packageId: number };
@@ -47,6 +51,8 @@ export const PaymentContextProvider = ({
   );
 
   const [paymentToken, setPaymentToken] = useLocalStorage("payment-token", "");
+  const [valueRemainingInToken, setValueRemainingInToken] = useState(-1);
+
   const paymentTokenRef = useRef<string>(paymentToken);
 
   paymentTokenRef.current = paymentToken;
@@ -142,6 +148,10 @@ export const PaymentContextProvider = ({
     onGetPaymentTokenFailure.current();
   }, []);
 
+  const updateValueRemainingInToken = useCallback((newValue: number) => {
+    setValueRemainingInToken(Math.max(-1, newValue));
+  }, []);
+
   const revokePaymentToken = useCallback(() => {
     paymentTokenRef.current = "";
     setPaymentToken("");
@@ -169,6 +179,14 @@ export const PaymentContextProvider = ({
   }, [verifyUrl]);
 
   useEffect(() => {
+    if (!paymentToken) updateValueRemainingInToken(-1);
+
+    API.getTokenRemainingValue(paymentToken).then(({ value }) => {
+      updateValueRemainingInToken(value);
+    });
+  }, [paymentToken, updateValueRemainingInToken]);
+
+  useEffect(() => {
     if (paymentToken) {
       onGetPaymentTokenSuccess.current(paymentToken);
       onGetPaymentTokenSuccess.current = () => {};
@@ -189,8 +207,11 @@ export const PaymentContextProvider = ({
         prefersPayImmediately,
         setPrefersPayImmediately,
         requestPaymentToken,
+        paymentToken,
         setPaymentToken,
         revokePaymentToken,
+        valueRemainingInToken,
+        updateValueRemainingInToken,
       }}
     >
       {children}
@@ -207,13 +228,19 @@ export const usePayment = () => {
     requestPayment,
     requestPaymentToken,
     revokePaymentToken,
+    paymentToken,
     setPaymentToken,
+    valueRemainingInToken,
+    updateValueRemainingInToken,
   } = ctx;
   return {
     requestPayment,
     requestPaymentToken,
     revokePaymentToken,
+    paymentToken,
     setPaymentToken,
+    valueRemainingInToken,
+    updateValueRemainingInToken,
   };
 };
 

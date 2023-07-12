@@ -77,6 +77,16 @@ export const DB = {
     return newValue;
   },
 
+  getTokenRemainingValue: async (token: string) => {
+    await connectDB();
+
+    const tokenObj = await DB.getToken(token);
+
+    if (!tokenObj) throw new Error("Token not found");
+
+    return tokenObj.value;
+  },
+
   tokenHasValue: async (_token: string) => {
     const token = await DB.getToken(_token);
 
